@@ -70,7 +70,8 @@ func newTestYubiKey(t *testing.T) (*YubiKey, func()) {
 		t.Fatalf("listing cards: %v", err)
 	}
 	for _, card := range cards {
-		if !strings.Contains(strings.ToLower(card), "yubikey") {
+		if !strings.Contains(strings.ToLower(card), "yubikey") &&
+			!strings.Contains(strings.ToLower(card), "canokey") {
 			continue
 		}
 		if !canModifyYubiKey {
@@ -101,7 +102,8 @@ func TestMultipleConnections(t *testing.T) {
 		t.Fatalf("listing cards: %v", err)
 	}
 	for _, card := range cards {
-		if !strings.Contains(strings.ToLower(card), "yubikey") {
+		if !strings.Contains(strings.ToLower(card), "yubikey") &&
+			!strings.Contains(strings.ToLower(card), "canokey") {
 			continue
 		}
 		if !canModifyYubiKey {

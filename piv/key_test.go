@@ -202,7 +202,7 @@ func TestPINPrompt(t *testing.T) {
 }
 
 func supportsAttestation(yk *YubiKey) bool {
-	return supportsVersion(yk.Version(), 4, 3, 0)
+	return yk.vendor == vendorYubico && supportsVersion(yk.Version(), 4, 3, 0)
 }
 
 func TestSlots(t *testing.T) {
@@ -288,6 +288,10 @@ func TestSlots(t *testing.T) {
 	}
 }
 
+func supportsRSA1024(yk *YubiKey) bool {
+	return yk.vendor != vendorCanokeys
+}
+
 func TestYubiKeySignRSA(t *testing.T) {
 	tests := []struct {
 		name string
@@ -304,6 +308,9 @@ func TestYubiKeySignRSA(t *testing.T) {
 			}
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && test.alg == AlgorithmRSA1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 			slot := SlotAuthentication
 			key := Key{
 				Algorithm:   test.alg,
@@ -354,6 +361,9 @@ func TestYubiKeySignRSAPSS(t *testing.T) {
 			}
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && test.alg == AlgorithmRSA1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 			slot := SlotAuthentication
 			key := Key{
 				Algorithm:   test.alg,
@@ -393,6 +403,9 @@ func TestYubiKeySignRSAPSS(t *testing.T) {
 func TestTLS13(t *testing.T) {
 	yk, close := newTestYubiKey(t)
 	defer close()
+	if !supportsRSA1024(yk) {
+		t.Skip("skipping RSA 1024 algorithm tests")
+	}
 	slot := SlotAuthentication
 	key := Key{
 		Algorithm:   AlgorithmRSA1024,
@@ -527,6 +540,9 @@ func TestYubiKeyDecryptRSA(t *testing.T) {
 			}
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && test.alg == AlgorithmRSA1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 			slot := SlotAuthentication
 			key := Key{
 				Algorithm:   test.alg,
@@ -575,8 +591,9 @@ func TestYubiKeyAttestation(t *testing.T) {
 		PINPolicy:   PINPolicyNever,
 		TouchPolicy: TouchPolicyNever,
 	}
-
-	testRequiresVersion(t, yk, 4, 3, 0)
+	if !supportsAttestation(yk) {
+		t.Skip("attestation is not supported")
+	}
 
 	cert, err := yk.AttestationCertificate()
 	if err != nil {
@@ -720,6 +737,9 @@ func TestYubiKeyGenerateKey(t *testing.T) {
 			}
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && test.alg == AlgorithmRSA1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 			if test.alg == AlgorithmEC384 {
 				testRequiresVersion(t, yk, 4, 3, 0)
 			}
@@ -907,6 +927,9 @@ func TestSetRSAPrivateKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && tt.bits == 1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 
 			generated, err := rsa.GenerateKey(rand.Reader, tt.bits)
 			if err != nil {

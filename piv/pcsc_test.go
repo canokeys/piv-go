@@ -55,7 +55,8 @@ func runHandleTest(t *testing.T, f func(t *testing.T, h *scHandle)) {
 		}
 		reader := ""
 		for _, r := range readers {
-			if strings.Contains(strings.ToLower(r), "yubikey") {
+			if strings.Contains(strings.ToLower(r), "yubikey") ||
+				strings.Contains(strings.ToLower(r), "canokey") {
 				reader = r
 				break
 			}

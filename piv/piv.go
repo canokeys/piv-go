@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"strings"
 )
 
 var (
@@ -94,7 +95,12 @@ const (
 	insAttest        = 0xf9
 	insGetSerial     = 0xf8
 	insGetMetadata   = 0xf7
+
+	vendorYubico   = 0
+	vendorCanokeys = 1
 )
+
+type vendor int
 
 // YubiKey is an exclusive open connection to a YubiKey smart card. While open,
 // no other process can query the given card.
@@ -113,6 +119,7 @@ type YubiKey struct {
 	// YubiKey's version or PIV version? A NEO reports v1.0.4. Figure this out
 	// before exposing an API.
 	version *version
+	vendor  vendor
 }
 
 // Close releases the connection to the smart card.
@@ -176,6 +183,9 @@ func (c *client) Open(card string) (*YubiKey, error) {
 		return nil, fmt.Errorf("getting yubikey version: %w", err)
 	}
 	yk.version = v
+	if strings.Contains(strings.ToLower(card), "canokey") {
+		yk.vendor = vendorCanokeys
+	}
 	if c.Rand != nil {
 		yk.rand = c.Rand
 	} else {
