@@ -387,6 +387,8 @@ var (
 	SlotKeyManagement      = Slot{0x9d, 0x5fc10b}
 
 	slotAttestation = Slot{0xf9, 0x5fff01}
+	slotUserPIN     = Slot{0x80, 0}
+	slotUserPUK     = Slot{0x81, 0}
 )
 
 var retiredKeyManagementSlots = map[uint32]Slot{
@@ -448,6 +450,9 @@ const (
 	AlgorithmEd25519
 	AlgorithmRSA1024
 	AlgorithmRSA2048
+	AlgorithmRSA3072
+	AlgorithmRSA4096
+	AlgorithmNA
 )
 
 // PINPolicy represents PIN requirements when signing or decrypting with an
@@ -531,6 +536,9 @@ var algorithmsMap = map[Algorithm]byte{
 	AlgorithmEd25519: algEd25519,
 	AlgorithmRSA1024: algRSA1024,
 	AlgorithmRSA2048: algRSA2048,
+	AlgorithmRSA3072: algRSA3072,
+	AlgorithmRSA4096: algRSA4096,
+	AlgorithmNA:      algNA,
 }
 
 var algorithmsMapInv = map[byte]Algorithm{
@@ -539,6 +547,9 @@ var algorithmsMapInv = map[byte]Algorithm{
 	algEd25519: AlgorithmEd25519,
 	algRSA1024: AlgorithmRSA1024,
 	algRSA2048: AlgorithmRSA2048,
+	algRSA3072: AlgorithmRSA3072,
+	algRSA4096: AlgorithmRSA4096,
+	algNA:      AlgorithmNA,
 }
 
 // AttestationCertificate returns the YubiKey's attestation certificate, which
@@ -601,6 +612,8 @@ type KeyInfo struct {
 	TouchPolicy TouchPolicy
 	Origin      Origin
 	PublicKey   crypto.PublicKey
+	DefaultVal  bool
+	Retries     uint8
 }
 
 func (ki *KeyInfo) unmarshal(b []byte) error {
@@ -645,16 +658,18 @@ func (ki *KeyInfo) unmarshal(b []byte) error {
 			if err != nil {
 				return fmt.Errorf("parse public key: %w", err)
 			}
+		case 5:
+			if len(v.Bytes) != 1 {
+				return errors.New("invalid default_value in response")
+			}
+			ki.DefaultVal = v.Bytes[0] != 0
+		case 6:
+			if len(v.Bytes) != 2 {
+				return errors.New("invalid retries in response")
+			}
+			// v.Bytes[0] is the default retry count
+			ki.Retries = v.Bytes[1]
 		default:
-			// TODO: According to the Yubico website, we get two more fields,
-			// if we pass 0x80 or 0x81 as slots:
-			//     1. Default value (for PIN/PUK and management key): Whether the
-			//        default value is used.
-			//     2. Retries (for PIN/PUK): The number of retries remaining
-			// However, it seems the reference implementation does not expect
-			// these and can not parse them out:
-			// https://github.com/Yubico/yubico-piv-tool/blob/yubico-piv-tool-2.3.1/lib/util.c#L1529
-			// For now, we just ignore them.
 		}
 	}
 	return nil
@@ -927,7 +942,7 @@ func (k KeyAuth) do(yk *YubiKey, pp PINPolicy, f func(tx *scTx) ([]byte, error))
 }
 
 func pinPolicy(yk *YubiKey, slot Slot) (PINPolicy, error) {
-	if supportsVersion(yk.Version(), 5, 3, 0) {
+	if yk.vendor == vendorCanokeys || supportsVersion(yk.Version(), 5, 3, 0) {
 		info, err := yk.KeyInfo(slot)
 		if err != nil {
 			return 0, fmt.Errorf("get key info: %v", err)

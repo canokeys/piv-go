@@ -171,6 +171,27 @@ func TestYubiKeyPINRetries(t *testing.T) {
 	if retries < 0 || retries > 15 {
 		t.Fatalf("invalid number of retries: %d", retries)
 	}
+	if err := yk.VerifyPIN("999999"); err == nil {
+		t.Fatalf("should not pass")
+	}
+	retries1, err := yk.Retries()
+	if err != nil {
+		t.Fatalf("getting retries: %v", err)
+	}
+	if retries1 != retries-1 {
+		t.Fatalf("retry counter didn't decrease")
+	}
+
+	testRequiresVersion(t, yk, 5, 3, 0)
+
+	info, err := yk.KeyInfo(slotUserPIN)
+	if err != nil {
+		t.Fatalf("KeyInfo() = _, %v", err)
+	}
+	if retries1 != int(info.Retries) || !info.DefaultVal {
+		t.Fatalf("metadata of slot 0x80 is wrong: %v", info)
+	}
+
 }
 
 func TestYubiKeyReset(t *testing.T) {
@@ -273,14 +294,33 @@ func TestYubiKeyChangePUK(t *testing.T) {
 	defer close()
 
 	newPUK := "87654321"
+	info1, err1 := yk.KeyInfo(slotUserPUK)
 	if err := yk.SetPUK(newPUK, newPUK); err == nil {
 		t.Errorf("successfully changed puk with invalid puk, expected error")
 	}
+	info2, err2 := yk.KeyInfo(slotUserPUK)
 	if err := yk.SetPUK(DefaultPUK, newPUK); err != nil {
 		t.Fatalf("changing puk: %v", err)
 	}
+	info3, err3 := yk.KeyInfo(slotUserPUK)
 	if err := yk.SetPUK(newPUK, DefaultPUK); err != nil {
 		t.Fatalf("resetting puk: %v", err)
+	}
+	info4, err4 := yk.KeyInfo(slotUserPUK)
+
+	testRequiresVersion(t, yk, 5, 3, 0)
+
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		t.Fatalf("KeyInfo() = _, %v, %v, %v, %v", err1, err2, err3, err4)
+	}
+	if info2.Retries != info1.Retries-1 {
+		t.Fatalf("retry counter didn't decrease")
+	}
+	if info3.Retries <= info2.Retries {
+		t.Fatalf("retry counter didn't reset")
+	}
+	if info3.DefaultVal || !info4.DefaultVal {
+		t.Fatalf("metadata of slot 0x81 is wrong: %v, %v", info3, info4)
 	}
 }
 

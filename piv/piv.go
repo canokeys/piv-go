@@ -67,6 +67,13 @@ const (
 	// non-standard; as implemented by SoloKeys. Chosen for low probability of eventual
 	// clashes, if and when PIV standard adds Ed25519 support
 	algEd25519 = 0x22
+	// extensions from Canokeys
+	algRSA3072 = 0x50
+	algRSA4096 = 0x51
+	algX25519  = 0x52
+	algP256K1  = 0x53
+	algSM2     = 0x54
+	algNA      = 0xFF
 
 	// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-78-4.pdf#page=16
 	keyAuthentication     = 0x9a
