@@ -1277,6 +1277,9 @@ func TestKeyInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			yk, close := newTestYubiKey(t)
 			defer close()
+			if !supportsRSA1024(yk) && test.policy.Algorithm == AlgorithmRSA1024 {
+				t.Skip("skipping RSA 1024 algorithm tests")
+			}
 
 			want := KeyInfo{
 				Algorithm:   test.policy.Algorithm,
