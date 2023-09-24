@@ -159,6 +159,12 @@ func TestYubiKeyLoginNeeded(t *testing.T) {
 	if ykLoginNeeded(yk.tx) {
 		t.Errorf("expected no login needed")
 	}
+	if err := ykLogout(yk.tx); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if !ykLoginNeeded(yk.tx) {
+		t.Errorf("expected login needed after logout")
+	}
 }
 
 func TestYubiKeyPINRetries(t *testing.T) {
