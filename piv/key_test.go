@@ -1314,6 +1314,73 @@ func TestKeyInfo(t *testing.T) {
 	}
 }
 
+func TestInvalidKeyParam(t *testing.T) {
+
+	yk, close := newTestYubiKey(t)
+	defer close()
+	if err := ykAuthenticate(yk.tx, DefaultManagementKey, yk.rand); err != nil {
+		t.Fatalf("authenticating with management key: %v", err)
+	}
+
+	tags := []byte{0x06, 0x30, 0x2C, 0x6D, 0x90, 0xAC, 0x90, 0x59, 0x64, 0x8F, 0x74, 0x1F, 0xF9, 0x3F, 0x32, 0x04, 0x1E, 0x88, 0xA2, 0x3F, 0x2D, 0x51, 0x23, 0x81, 0xAA, 0xEF, 0xB8, 0x5A, 0x0C, 0x28, 0x1A, 0x77, 0xFA, 0xA3, 0xF7, 0x82, 0xA5, 0x45, 0xF7, 0x64, 0xE0, 0x51, 0x13, 0x1A, 0xE6, 0x68, 0x84, 0xDA, 0xF3, 0xDC}
+	opt := Key{AlgorithmEC256, PINPolicyAlways, TouchPolicyNever}
+	slot := Slot{Key: 0x9A}
+
+	err := ykImportKey(yk.tx, tags, slot, opt)
+	if err == nil {
+		t.Fatalf("Should fail with invalid length")
+	}
+	opt.Algorithm = AlgorithmRSA2048
+	err = ykImportKey(yk.tx, tags, slot, opt)
+	if err == nil {
+		t.Fatalf("Should fail with invalid type")
+	}
+
+	tests := []struct {
+		slot uint32
+		alg  Algorithm
+	}{
+		{slot: 0x90, alg: AlgorithmEC256},
+		{slot: 0x9B, alg: AlgorithmEC384},
+		{slot: 0x9A, alg: AlgorithmNA},
+	}
+	for _, test := range tests {
+		opt.Algorithm = test.alg
+		slot.Key = test.slot
+		_, err = ykGenerateKey(yk.tx, slot, opt)
+		if err == nil {
+			t.Fatalf("Should fail with invalid alg/slot")
+		}
+		err = ykImportKey(yk.tx, tags, slot, opt)
+		if err == nil {
+			t.Fatalf("Should fail with invalid alg/slot")
+		}
+	}
+	cmd := apdu{
+		instruction: insGenerateAsymmetric,
+		param2:      0x9D,
+		data: []byte{
+			0xac,
+			0x04, // wrong format of remaining data
+			algTag, 0x01, algRSA2048,
+			0xFF,
+		},
+	}
+	if _, err := yk.tx.Transmit(cmd); err == nil {
+		t.Fatalf("Should fail with invalid alg")
+	}
+	cmd = apdu{
+		instruction: insImportKey,
+		param1:      0x03, // 3DES
+		param2:      0x9D,
+		data:        tags,
+	}
+	if _, err := yk.tx.Transmit(cmd); err == nil {
+		t.Fatalf("Should fail with invalid alg")
+	}
+
+}
+
 // TestDerivePINPolicy checks that Yubikeys with version >= 5.3.0 use the
 // KeyInfo method to determine the pin policy, instead of the attestation
 // certificate.
