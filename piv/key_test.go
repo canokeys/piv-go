@@ -47,40 +47,47 @@ func TestYubiKeySignECDSA(t *testing.T) {
 
 	slot := SlotAuthentication
 
-	key := Key{
-		Algorithm:   AlgorithmEC256,
-		TouchPolicy: TouchPolicyNever,
-		PINPolicy:   PINPolicyNever,
-	}
-	pubKey, err := yk.GenerateKey(DefaultManagementKey, slot, key)
-	if err != nil {
-		t.Fatalf("generating key: %v", err)
-	}
-	pub, ok := pubKey.(*ecdsa.PublicKey)
-	if !ok {
-		t.Fatalf("public key is not an ecdsa key")
-	}
-	data := sha256.Sum256([]byte("hello"))
-	priv, err := yk.PrivateKey(slot, pub, KeyAuth{})
-	if err != nil {
-		t.Fatalf("getting private key: %v", err)
-	}
-	s, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("expected private key to implement crypto.Signer")
-	}
-	out, err := s.Sign(rand.Reader, data[:], crypto.SHA256)
-	if err != nil {
-		t.Fatalf("signing failed: %v", err)
-	}
-	var sig struct {
-		R, S *big.Int
-	}
-	if _, err := asn1.Unmarshal(out, &sig); err != nil {
-		t.Fatalf("unmarshaling signature: %v", err)
-	}
-	if !ecdsa.Verify(pub, data[:], sig.R, sig.S) {
-		t.Errorf("signature didn't match")
+	for _, alg := range []Algorithm{AlgorithmEC256, AlgorithmEC384, AlgorithmEd25519} {
+		t.Logf("alg=%x", alg)
+		key := Key{
+			Algorithm:   alg,
+			TouchPolicy: TouchPolicyNever,
+			PINPolicy:   PINPolicyNever,
+		}
+		pubKey, err := yk.GenerateKey(DefaultManagementKey, slot, key)
+		if err != nil {
+			t.Fatalf("generating key: %v", err)
+		}
+		data := sha256.Sum256([]byte("hello"))
+		priv, err := yk.PrivateKey(slot, pubKey, KeyAuth{})
+		if err != nil {
+			t.Fatalf("getting private key: %v", err)
+		}
+		s, ok := priv.(crypto.Signer)
+		if !ok {
+			t.Fatalf("expected private key to implement crypto.Signer")
+		}
+		out, err := s.Sign(rand.Reader, data[:], crypto.SHA256)
+		if err != nil {
+			t.Fatalf("signing failed: %v", err)
+		}
+
+		if pub, ok := pubKey.(*ecdsa.PublicKey); ok {
+			var sig struct {
+				R, S *big.Int
+			}
+			if _, err := asn1.Unmarshal(out, &sig); err != nil {
+				t.Fatalf("unmarshaling signature: %v", err)
+			}
+			if !ecdsa.Verify(pub, data[:], sig.R, sig.S) {
+				t.Errorf("signature didn't match")
+			}
+		} else if pub, ok := pubKey.(ed25519.PublicKey); ok {
+			if !ed25519.Verify(pub, data[:], out) {
+				t.Errorf("signature didn't match")
+			}
+		}
+
 	}
 }
 
@@ -1207,6 +1214,12 @@ func TestKeyInfo(t *testing.T) {
 			Key{AlgorithmRSA2048, PINPolicyNever, TouchPolicyNever},
 		},
 		{
+			"Generated ed25519",
+			SlotAuthentication,
+			nil,
+			Key{AlgorithmEd25519, PINPolicyNever, TouchPolicyNever},
+		},
+		{
 			"Imported ec_256",
 			SlotAuthentication,
 			ephemeralKey(t, AlgorithmEC256),
@@ -1229,6 +1242,12 @@ func TestKeyInfo(t *testing.T) {
 			SlotAuthentication,
 			ephemeralKey(t, AlgorithmRSA2048),
 			Key{AlgorithmRSA2048, PINPolicyNever, TouchPolicyNever},
+		},
+		{
+			"Imported ed25519",
+			SlotAuthentication,
+			ephemeralKey(t, AlgorithmEd25519),
+			Key{AlgorithmEd25519, PINPolicyNever, TouchPolicyNever},
 		},
 		{
 			"PINPolicyOnce",

@@ -1073,6 +1073,11 @@ func (yk *YubiKey) SetPrivateKeyInsecure(key [24]byte, slot Slot, private crypto
 		copy(privateKey[padding:], valueBytes)
 
 		params = append(params, privateKey)
+	case ed25519.PrivateKey:
+		paramTag = 0x6
+		elemLen = ed25519.SeedSize
+		params = append(params, priv[:elemLen])
+
 	default:
 		return errors.New("unsupported private key type")
 	}
