@@ -1380,13 +1380,13 @@ func TestInvalidKeyParam(t *testing.T) {
 		param2:      0x9D,
 		data: []byte{
 			0xac,
-			0x04, // wrong format of remaining data
+			0x06, // wrong format of remaining data
 			algTag, 0x01, algRSA2048,
-			0xFF,
+			0xAA, 0x02, 0xFF,
 		},
 	}
 	if _, err := yk.tx.Transmit(cmd); err == nil {
-		t.Fatalf("Should fail with invalid alg")
+		t.Fatalf("Should fail with invalid metadata")
 	}
 	cmd = apdu{
 		instruction: insImportKey,
